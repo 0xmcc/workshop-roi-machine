@@ -1,0 +1,7 @@
+{
+  "name": "Workshop ROI Machine",
+  "description": "An automated post-workshop conversion pipeline that captures outcomes, orchestrates personalized follow-ups, and identifies high-value leads to maximize workshop revenue.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
