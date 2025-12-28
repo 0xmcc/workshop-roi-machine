@@ -1,0 +1,798 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+components/
+  StatCard.tsx
+  WorkshopDetail.tsx
+services/
+  geminiService.ts
+.gitignore
+App.tsx
+constants.tsx
+index.html
+index.tsx
+metadata.json
+package.json
+README.md
+tsconfig.json
+types.ts
+vite.config.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="components/StatCard.tsx">
+import React from 'react';
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  trend?: string;
+  trendUp?: boolean;
+}
+
+export const StatCard: React.FC<StatCardProps> = ({ label, value, icon, trend, trendUp }) => {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-4">
+        <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">{icon}</span>
+        {trend && (
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+            {trend}
+          </span>
+        )}
+      </div>
+      <div>
+        <p className="text-sm text-slate-500 font-medium">{label}</p>
+        <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="components/WorkshopDetail.tsx">
+import React, { useState } from 'react';
+import { Workshop, Attendee, ProjectStatus } from '../types';
+import { Icons } from '../constants';
+import { generateFollowUpMessage } from '../services/geminiService';
+
+interface WorkshopDetailProps {
+  workshop: Workshop;
+  onBack: () => void;
+}
+
+export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack }) => {
+  const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
+  const [aiMessage, setAiMessage] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAI = async (attendee: Attendee) => {
+    setSelectedAttendee(attendee);
+    setIsGenerating(true);
+    setAiMessage('');
+    const msg = await generateFollowUpMessage(attendee, workshop);
+    setAiMessage(msg);
+    setIsGenerating(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <button 
+        onClick={onBack}
+        className="text-slate-500 hover:text-indigo-600 flex items-center gap-2 transition-colors"
+      >
+        <Icons.ArrowRight className="rotate-180 w-4 h-4" />
+        Back to Dashboard
+      </button>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-8 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{workshop.title}</h1>
+              <p className="text-slate-500">{workshop.date} • {workshop.venue}</p>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full">
+                Conversion Goal: {workshop.conversionGoal}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-wider">
+              <tr>
+                <th className="px-8 py-4 font-semibold">Attendee</th>
+                <th className="px-6 py-4 font-semibold">Project</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold text-center">Score</th>
+                <th className="px-8 py-4 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {workshop.attendees.map((attendee) => (
+                <tr key={attendee.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-8 py-5">
+                    <div className="font-semibold text-slate-800">{attendee.name}</div>
+                    <div className="text-xs text-slate-500">{attendee.email}</div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="text-sm text-slate-600">{attendee.projectName}</div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                      attendee.status === ProjectStatus.SHIPPED ? 'bg-emerald-50 text-emerald-600' :
+                      attendee.status === ProjectStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-600' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {attendee.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    <div className={`text-sm font-bold ${
+                      attendee.engagementScore > 80 ? 'text-indigo-600' : 'text-slate-400'
+                    }`}>
+                      {attendee.engagementScore}
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 text-right">
+                    <button 
+                      onClick={() => handleGenerateAI(attendee)}
+                      className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+                    >
+                      <Icons.Sparkles className="w-4 h-4" />
+                      AI Follow-up
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selectedAttendee && (
+        <div className="bg-indigo-900 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Icons.Sparkles className="w-32 h-32" />
+          </div>
+          <div className="relative z-10 max-w-2xl">
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+              <Icons.Zap className="text-amber-400" />
+              Generated Strategy for {selectedAttendee.name}
+            </h3>
+            <p className="text-indigo-200 text-sm mb-6">
+              AI-crafted sequence based on their project: "{selectedAttendee.projectName}"
+            </p>
+            
+            {isGenerating ? (
+              <div className="flex items-center gap-3 animate-pulse">
+                <div className="h-4 w-4 bg-indigo-400 rounded-full"></div>
+                <p className="text-indigo-300">Drafting the perfect pitch...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-white/10 p-5 rounded-xl border border-white/10 font-mono text-sm leading-relaxed whitespace-pre-wrap">
+                  {aiMessage}
+                </div>
+                <div className="flex gap-3">
+                  <button className="bg-white text-indigo-900 hover:bg-indigo-50 px-6 py-2.5 rounded-lg font-semibold transition-colors">
+                    Send via Email
+                  </button>
+                  <button className="bg-transparent border border-white/30 text-white hover:bg-white/10 px-6 py-2.5 rounded-lg font-semibold transition-colors">
+                    Edit Sequence
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+</file>
+
+<file path="services/geminiService.ts">
+import { GoogleGenAI } from "@google/genai";
+import { Attendee, Workshop } from "../types";
+
+export const generateFollowUpMessage = async (attendee: Attendee, workshop: Workshop): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  
+  const prompt = `
+    Context:
+    Workshop Title: ${workshop.title}
+    Topic: ${workshop.topic}
+    Attendee Name: ${attendee.name}
+    Project Built: ${attendee.projectName}
+    Project Status: ${attendee.status}
+    Goal: Convert them to ${workshop.conversionGoal}
+
+    Task:
+    Write a highly personalized, enthusiastic follow-up email/message. 
+    If they shipped, celebrate the achievement. 
+    If they are in progress, offer encouragement and a specific tip related to their project.
+    Keep it concise, punchy, and professional but warm. 
+    End with a clear next step related to the goal.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    return response.text || "Failed to generate message.";
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return "Error generating personalized message. Please try manual drafting.";
+  }
+};
+</file>
+
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vercel
+</file>
+
+<file path="App.tsx">
+import React, { useState, useMemo } from 'react';
+import { MOCK_WORKSHOPS, Icons } from './constants';
+import { Workshop, ProjectStatus } from './types';
+import { StatCard } from './components/StatCard';
+import { WorkshopDetail } from './components/WorkshopDetail';
+
+const App: React.FC = () => {
+  const [workshops] = useState<Workshop[]>(MOCK_WORKSHOPS);
+  const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
+
+  const stats = useMemo(() => {
+    const allAttendees = workshops.flatMap(w => w.attendees);
+    const totalAttendees = allAttendees.length;
+    const shippedCount = allAttendees.filter(a => a.status === ProjectStatus.SHIPPED).length;
+    const highValueLeads = allAttendees.filter(a => a.engagementScore >= 80).length;
+    const shipRate = totalAttendees > 0 ? (shippedCount / totalAttendees) * 100 : 0;
+
+    return {
+      totalWorkshops: workshops.length,
+      totalAttendees,
+      shipRate: `${shipRate.toFixed(1)}%`,
+      highValueLeads,
+      estimatedROI: `$${(highValueLeads * 299).toLocaleString()}` // Mock calculation
+    };
+  }, [workshops]);
+
+  const selectedWorkshop = useMemo(() => 
+    workshops.find(w => w.id === selectedWorkshopId)
+  , [workshops, selectedWorkshopId]);
+
+  const hotLeads = useMemo(() => {
+    return workshops
+      .flatMap(w => w.attendees.map(a => ({ ...a, workshopTitle: w.title })))
+      .filter(a => a.engagementScore >= 85)
+      .sort((a, b) => b.engagementScore - a.engagementScore)
+      .slice(0, 5);
+  }, [workshops]);
+
+  return (
+    <div className="min-h-screen text-slate-900 pb-20">
+      {/* Navigation */}
+      <nav className="bg-white border-b border-slate-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">W</div>
+            <h1 className="text-xl font-bold tracking-tight">Workshop <span className="text-indigo-600">ROI Machine</span></h1>
+          </div>
+          <div className="flex gap-4">
+            <button className="text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors">Settings</button>
+            <div className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden">
+              <img src="https://picsum.photos/32/32" alt="Avatar" />
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-6 mt-8">
+        {!selectedWorkshopId ? (
+          <div className="space-y-8 animate-fadeIn">
+            <header className="flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900">Performance Overview</h2>
+                <p className="text-slate-500 mt-1">Track your workshop conversion pipeline and hot leads.</p>
+              </div>
+              <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2">
+                <span className="text-xl">+</span> Import Attendee List
+              </button>
+            </header>
+
+            {/* Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <StatCard label="Workshops" value={stats.totalWorkshops} icon={<Icons.Zap className="w-5 h-5" />} />
+              <StatCard label="Attendees" value={stats.totalAttendees} icon={<Icons.Users className="w-5 h-5" />} />
+              <StatCard label="Ship Rate" value={stats.shipRate} trend="+12%" trendUp={true} icon={<Icons.TrendUp className="w-5 h-5" />} />
+              <StatCard label="Hot Leads" value={stats.highValueLeads} icon={<Icons.Sparkles className="w-5 h-5" />} />
+              <StatCard label="Est. Opportunity" value={stats.estimatedROI} icon={<Icons.TrendUp className="w-5 h-5" />} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Active Workshops List */}
+              <div className="lg:col-span-2 space-y-4">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  Active Pipelines
+                  <span className="bg-slate-100 text-slate-600 text-[10px] uppercase px-2 py-0.5 rounded">Live</span>
+                </h3>
+                {workshops.map(workshop => (
+                  <div 
+                    key={workshop.id}
+                    onClick={() => setSelectedWorkshopId(workshop.id)}
+                    className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-300 transition-all cursor-pointer group"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <h4 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{workshop.title}</h4>
+                        <p className="text-sm text-slate-500 flex items-center gap-2">
+                          {workshop.date} • {workshop.venue}
+                        </p>
+                      </div>
+                      <Icons.ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-600 transition-transform group-hover:translate-x-1" />
+                    </div>
+                    <div className="mt-6 flex items-center justify-between">
+                      <div className="flex -space-x-2">
+                        {[1, 2, 3].map(i => (
+                          <img key={i} className="w-8 h-8 rounded-full border-2 border-white" src={`https://picsum.photos/40/40?random=${i}`} alt="Attendee" />
+                        ))}
+                        <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                          +{workshop.attendees.length - 3}
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium text-slate-400">
+                        Goal: <span className="text-slate-700">{workshop.conversionGoal}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Hot Leads Sidebar */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  Hot Leads Priority
+                  <span className="bg-amber-100 text-amber-600 text-[10px] uppercase px-2 py-0.5 rounded">Action Required</span>
+                </h3>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-100">
+                  {hotLeads.map(lead => (
+                    <div key={lead.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <div className="relative">
+                        <img src={`https://picsum.photos/48/48?random=${lead.id}`} className="w-12 h-12 rounded-full" alt={lead.name} />
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[8px] text-white font-bold">
+                          {lead.engagementScore}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{lead.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{lead.workshopTitle}</p>
+                        <p className="text-[10px] text-indigo-500 font-medium mt-1 uppercase tracking-tighter">
+                          {lead.questionsAsked > 3 ? `Asked ${lead.questionsAsked} Questions` : 'Shipped Project'}
+                        </p>
+                      </div>
+                      <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                        <Icons.Mail className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="p-4 text-center">
+                    <button className="text-xs font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
+                      View All High-Intensity Leads
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-2xl">
+                  <h4 className="text-sm font-bold text-indigo-900 mb-2">Automated Drip Status</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-indigo-700">Day 1 Follow-ups</span>
+                      <span className="text-indigo-900 font-bold">12 / 12 Sent</span>
+                    </div>
+                    <div className="w-full bg-indigo-200 rounded-full h-1.5">
+                      <div className="bg-indigo-600 h-1.5 rounded-full w-full"></div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-indigo-700">Day 3 Testimonial Ask</span>
+                      <span className="text-indigo-900 font-bold">8 / 12 Scheduled</span>
+                    </div>
+                    <div className="w-full bg-indigo-200 rounded-full h-1.5">
+                      <div className="bg-indigo-600 h-1.5 rounded-full w-[66%]"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <WorkshopDetail 
+            workshop={selectedWorkshop!} 
+            onBack={() => setSelectedWorkshopId(null)} 
+          />
+        )}
+      </main>
+
+      {/* Floating Action Button (Mobile/Context) */}
+      <button className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl hover:bg-black transition-all transform hover:scale-110 active:scale-95 z-[100]">
+        <Icons.Zap className="w-6 h-6 text-amber-400" />
+      </button>
+    </div>
+  );
+};
+
+export default App;
+</file>
+
+<file path="constants.tsx">
+import React from 'react';
+import { Workshop, ProjectStatus } from './types';
+
+export const MOCK_WORKSHOPS: Workshop[] = [
+  {
+    id: 'w1',
+    title: 'AI Product Builder Masterclass',
+    date: '2024-05-15',
+    venue: 'Google Campus / SF',
+    topic: 'Building MVPs with Gemini API',
+    conversionGoal: 'Annual Pro Membership ($299)',
+    attendees: [
+      {
+        id: 'a1',
+        name: 'Sarah Chen',
+        email: 'sarah@example.com',
+        projectName: 'Smart CRM Integration',
+        status: ProjectStatus.SHIPPED,
+        engagementScore: 95,
+        followUpSent: true,
+        notes: 'Highly engaged, asked about enterprise pricing.',
+        questionsAsked: 5
+      },
+      {
+        id: 'a2',
+        name: 'Marcus Thorne',
+        email: 'marcus@devs.io',
+        projectName: 'Voice Assistant for Seniors',
+        status: ProjectStatus.IN_PROGRESS,
+        engagementScore: 65,
+        followUpSent: false,
+        notes: 'Struggling with audio latency.',
+        questionsAsked: 2
+      },
+      {
+        id: 'a3',
+        name: 'Elena Rodriguez',
+        email: 'elena@startup.co',
+        projectName: 'Eco-Tracker Dashboard',
+        status: ProjectStatus.SHIPPED,
+        engagementScore: 88,
+        followUpSent: true,
+        notes: 'Already shared the project on LinkedIn.',
+        questionsAsked: 1
+      }
+    ]
+  },
+  {
+    id: 'w2',
+    title: 'Modern React Frameworks',
+    date: '2024-05-10',
+    venue: 'Corporate Office / Austin',
+    topic: 'Next.js 14 and Server Components',
+    conversionGoal: 'Team Training Package ($4,999)',
+    attendees: [
+      {
+        id: 'a4',
+        name: 'David Kim',
+        email: 'david.k@corp.com',
+        projectName: 'Internal Analytics Portal',
+        status: ProjectStatus.IN_PROGRESS,
+        engagementScore: 40,
+        followUpSent: false,
+        notes: 'Needs more help with cache revalidation.',
+        questionsAsked: 0
+      }
+    ]
+  }
+];
+
+export const Icons = {
+  Zap: (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M4 14.5a3.5 3.5 0 1 0 7 0 3.5 3.5 0 1 0-7 0"/><path d="M12 4h.01"/><path d="M12 10h.01"/><path d="M12 16h.01"/><path d="M12 22h.01"/><path d="M20 14.5a3.5 3.5 0 1 0-7 0 3.5 3.5 0 1 0 7 0"/></svg>
+  ),
+  TrendUp: (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m3 17 6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+  ),
+  Users: (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  ),
+  Sparkles: (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+  ),
+  ArrowRight: (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+  ),
+  Mail: (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+  )
+};
+</file>
+
+<file path="index.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop ROI Machine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
+</file>
+
+<file path="index.tsx">
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+</file>
+
+<file path="metadata.json">
+{
+  "name": "Workshop ROI Machine",
+  "description": "An automated post-workshop conversion pipeline that captures outcomes, orchestrates personalized follow-ups, and identifies high-value leads to maximize workshop revenue.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "workshop-roi-machine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "@google/genai": "^1.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
+</file>
+
+<file path="README.md">
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1a-O7k4pue-5W3419c4hF1r4ULvHdELCU
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+}
+</file>
+
+<file path="types.ts">
+export enum ProjectStatus {
+  SHIPPED = 'Shipped',
+  IN_PROGRESS = 'In Progress',
+  NOT_STARTED = 'Not Started'
+}
+
+export interface Attendee {
+  id: string;
+  name: string;
+  email: string;
+  projectName: string;
+  status: ProjectStatus;
+  engagementScore: number; // 0-100
+  followUpSent: boolean;
+  notes: string;
+  questionsAsked: number;
+}
+
+export interface Workshop {
+  id: string;
+  title: string;
+  date: string;
+  venue: string;
+  attendees: Attendee[];
+  topic: string;
+  conversionGoal: string; // e.g., "Join Membership", "Enroll in Cohort"
+}
+
+export interface ConversionMetrics {
+  totalWorkshops: number;
+  totalAttendees: number;
+  shipRate: number;
+  conversionRate: number;
+  estimatedROI: number;
+  potentialMRR: number;
+}
+</file>
+
+<file path="vite.config.ts">
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, '.', '');
+    return {
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      plugins: [react()],
+      define: {
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, '.'),
+        }
+      }
+    };
+});
+</file>
+
+</files>
