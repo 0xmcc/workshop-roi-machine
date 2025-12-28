@@ -1,41 +1,63 @@
 
-import React, { useState, useMemo } from 'react';
-import { MOCK_WORKSHOPS, Icons } from './constants';
-import { Workshop, ProjectStatus } from './types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Icons } from './constants';
 import { StatCard } from './components/StatCard';
 import { WorkshopDetail } from './components/WorkshopDetail';
+import type { FieldEventSummary, FieldEventAttendee } from './types';
+import { attendeesRepo } from './services/repos/attendeesRepo';
+import { dashboardRepo, type DashboardMetrics } from './services/repos/dashboardRepo';
+import { fieldEventsRepo } from './services/repos/fieldEventsRepo';
 
 const App: React.FC = () => {
-  const [workshops] = useState<Workshop[]>(MOCK_WORKSHOPS);
-  const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
+  const [fieldEvents, setFieldEvents] = useState<FieldEventSummary[] | null>(null);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [hotLeads, setHotLeads] = useState<Array<FieldEventAttendee & { fieldEventTitle: string }> | null>(null);
 
-  const stats = useMemo(() => {
-    const allAttendees = workshops.flatMap(w => w.attendees);
-    const totalAttendees = allAttendees.length;
-    const shippedCount = allAttendees.filter(a => a.status === ProjectStatus.SHIPPED).length;
-    const highValueLeads = allAttendees.filter(a => a.engagementScore >= 80).length;
-    const shipRate = totalAttendees > 0 ? (shippedCount / totalAttendees) * 100 : 0;
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-    return {
-      totalWorkshops: workshops.length,
-      totalAttendees,
-      shipRate: `${shipRate.toFixed(1)}%`,
-      highValueLeads,
-      estimatedROI: `$${(highValueLeads * 299).toLocaleString()}` // Mock calculation
+  const [selectedFieldEventId, setSelectedFieldEventId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isStale = false;
+
+    async function load() {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const [events, m, leads] = await Promise.all([
+          fieldEventsRepo.listSummaries(),
+          dashboardRepo.getMetrics(),
+          attendeesRepo.listHotLeads(5)
+        ]);
+
+        if (isStale) return;
+        setFieldEvents(events);
+        setMetrics(m);
+        setHotLeads(leads);
+      } catch (err: any) {
+        if (isStale) return;
+        setLoadError(err?.message ?? 'Failed to load data from Supabase.');
+        setFieldEvents([]);
+        setMetrics(null);
+        setHotLeads([]);
+      } finally {
+        if (isStale) return;
+        setIsLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      isStale = true;
     };
-  }, [workshops]);
+  }, []);
 
-  const selectedWorkshop = useMemo(() => 
-    workshops.find(w => w.id === selectedWorkshopId)
-  , [workshops, selectedWorkshopId]);
-
-  const hotLeads = useMemo(() => {
-    return workshops
-      .flatMap(w => w.attendees.map(a => ({ ...a, workshopTitle: w.title })))
-      .filter(a => a.engagementScore >= 85)
-      .sort((a, b) => b.engagementScore - a.engagementScore)
-      .slice(0, 5);
-  }, [workshops]);
+  const selectedFieldEvent = useMemo(
+    () => fieldEvents?.find((e) => e.id === selectedFieldEventId) ?? null,
+    [fieldEvents, selectedFieldEventId]
+  );
 
   return (
     <div className="min-h-screen text-slate-900 pb-20">
@@ -56,7 +78,7 @@ const App: React.FC = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 mt-8">
-        {!selectedWorkshopId ? (
+        {!selectedFieldEventId ? (
           <div className="space-y-8 animate-fadeIn">
             <header className="flex justify-between items-end">
               <div>
@@ -68,13 +90,41 @@ const App: React.FC = () => {
               </button>
             </header>
 
+            {loadError && (
+              <div className="bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {loadError}
+              </div>
+            )}
+
             {/* Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <StatCard label="Workshops" value={stats.totalWorkshops} icon={<Icons.Zap className="w-5 h-5" />} />
-              <StatCard label="Attendees" value={stats.totalAttendees} icon={<Icons.Users className="w-5 h-5" />} />
-              <StatCard label="Ship Rate" value={stats.shipRate} trend="+12%" trendUp={true} icon={<Icons.TrendUp className="w-5 h-5" />} />
-              <StatCard label="Hot Leads" value={stats.highValueLeads} icon={<Icons.Sparkles className="w-5 h-5" />} />
-              <StatCard label="Est. Opportunity" value={stats.estimatedROI} icon={<Icons.TrendUp className="w-5 h-5" />} />
+              <StatCard
+                label="Workshops"
+                value={isLoading ? null : metrics?.totalFieldEvents ?? 0}
+                icon={<Icons.Zap className="w-5 h-5" />}
+              />
+              <StatCard
+                label="Attendees"
+                value={isLoading ? null : metrics?.totalAttendees ?? 0}
+                icon={<Icons.Users className="w-5 h-5" />}
+              />
+              <StatCard
+                label="Ship Rate"
+                value={isLoading ? null : `${(metrics?.shipRatePct ?? 0).toFixed(1)}%`}
+                trend={undefined}
+                trendUp={true}
+                icon={<Icons.TrendUp className="w-5 h-5" />}
+              />
+              <StatCard
+                label="Hot Leads"
+                value={isLoading ? null : metrics?.hotLeads ?? 0}
+                icon={<Icons.Sparkles className="w-5 h-5" />}
+              />
+              <StatCard
+                label="Est. Opportunity"
+                value={isLoading ? null : `$${(metrics?.estimatedOpportunityUsd ?? 0).toLocaleString()}`}
+                icon={<Icons.TrendUp className="w-5 h-5" />}
+              />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -84,36 +134,49 @@ const App: React.FC = () => {
                   Active Pipelines
                   <span className="bg-slate-100 text-slate-600 text-[10px] uppercase px-2 py-0.5 rounded">Live</span>
                 </h3>
-                {workshops.map(workshop => (
-                  <div 
-                    key={workshop.id}
-                    onClick={() => setSelectedWorkshopId(workshop.id)}
+                {(fieldEvents ?? []).map((fieldEvent) => (
+                  <div
+                    key={fieldEvent.id}
+                    onClick={() => setSelectedFieldEventId(fieldEvent.id)}
                     className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-300 transition-all cursor-pointer group"
                   >
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
-                        <h4 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{workshop.title}</h4>
+                        <h4 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                          {fieldEvent.title}
+                        </h4>
                         <p className="text-sm text-slate-500 flex items-center gap-2">
-                          {workshop.date} • {workshop.venue}
+                          {fieldEvent.date} • {fieldEvent.venue}
                         </p>
                       </div>
                       <Icons.ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-600 transition-transform group-hover:translate-x-1" />
                     </div>
                     <div className="mt-6 flex items-center justify-between">
                       <div className="flex -space-x-2">
-                        {[1, 2, 3].map(i => (
-                          <img key={i} className="w-8 h-8 rounded-full border-2 border-white" src={`https://picsum.photos/40/40?random=${i}`} alt="Attendee" />
+                        {Array.from({ length: Math.min(3, fieldEvent.attendeeCount) }, (_, i) => i + 1).map((i) => (
+                          <img
+                            key={i}
+                            className="w-8 h-8 rounded-full border-2 border-white"
+                            src={`https://picsum.photos/40/40?random=${fieldEvent.id}-${i}`}
+                            alt="Attendee"
+                          />
                         ))}
-                        <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                          +{workshop.attendees.length - 3}
-                        </div>
+                        {fieldEvent.attendeeCount > 3 && (
+                          <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                            +{fieldEvent.attendeeCount - 3}
+                          </div>
+                        )}
                       </div>
                       <div className="text-sm font-medium text-slate-400">
-                        Goal: <span className="text-slate-700">{workshop.conversionGoal}</span>
+                        Goal: <span className="text-slate-700">{fieldEvent.conversionGoal}</span>
                       </div>
                     </div>
                   </div>
                 ))}
+
+                {isLoading && (
+                  <div className="text-sm text-slate-400 px-2 py-2">Loading pipelines…</div>
+                )}
               </div>
 
               {/* Hot Leads Sidebar */}
@@ -123,7 +186,7 @@ const App: React.FC = () => {
                   <span className="bg-amber-100 text-amber-600 text-[10px] uppercase px-2 py-0.5 rounded">Action Required</span>
                 </h3>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-100">
-                  {hotLeads.map(lead => (
+                  {(hotLeads ?? []).map((lead) => (
                     <div key={lead.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors cursor-pointer">
                       <div className="relative">
                         <img src={`https://picsum.photos/48/48?random=${lead.id}`} className="w-12 h-12 rounded-full" alt={lead.name} />
@@ -133,7 +196,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-900 truncate">{lead.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{lead.workshopTitle}</p>
+                        <p className="text-xs text-slate-500 truncate">{lead.fieldEventTitle}</p>
                         <p className="text-[10px] text-indigo-500 font-medium mt-1 uppercase tracking-tighter">
                           {lead.questionsAsked > 3 ? `Asked ${lead.questionsAsked} Questions` : 'Shipped Project'}
                         </p>
@@ -154,18 +217,38 @@ const App: React.FC = () => {
                   <h4 className="text-sm font-bold text-indigo-900 mb-2">Automated Drip Status</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-indigo-700">Day 1 Follow-ups</span>
-                      <span className="text-indigo-900 font-bold">12 / 12 Sent</span>
+                      <span className="text-indigo-700">Draft Follow-ups</span>
+                      <span className="text-indigo-900 font-bold">
+                        {isLoading ? '—' : metrics ? `${metrics.drafts} Drafts` : '—'}
+                      </span>
                     </div>
                     <div className="w-full bg-indigo-200 rounded-full h-1.5">
-                      <div className="bg-indigo-600 h-1.5 rounded-full w-full"></div>
+                      <div
+                        className="bg-indigo-600 h-1.5 rounded-full"
+                        style={{
+                          width:
+                            !metrics || metrics.drafts + metrics.sent === 0
+                              ? '0%'
+                              : `${Math.round((metrics.drafts / (metrics.drafts + metrics.sent)) * 100)}%`
+                        }}
+                      ></div>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-indigo-700">Day 3 Testimonial Ask</span>
-                      <span className="text-indigo-900 font-bold">8 / 12 Scheduled</span>
+                      <span className="text-indigo-700">Sent Follow-ups</span>
+                      <span className="text-indigo-900 font-bold">
+                        {isLoading ? '—' : metrics ? `${metrics.sent} Sent` : '—'}
+                      </span>
                     </div>
                     <div className="w-full bg-indigo-200 rounded-full h-1.5">
-                      <div className="bg-indigo-600 h-1.5 rounded-full w-[66%]"></div>
+                      <div
+                        className="bg-indigo-600 h-1.5 rounded-full"
+                        style={{
+                          width:
+                            !metrics || metrics.drafts + metrics.sent === 0
+                              ? '0%'
+                              : `${Math.round((metrics.sent / (metrics.drafts + metrics.sent)) * 100)}%`
+                        }}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -174,8 +257,8 @@ const App: React.FC = () => {
           </div>
         ) : (
           <WorkshopDetail 
-            workshop={selectedWorkshop!} 
-            onBack={() => setSelectedWorkshopId(null)} 
+            fieldEvent={selectedFieldEvent!}
+            onBack={() => setSelectedFieldEventId(null)}
           />
         )}
       </main>
