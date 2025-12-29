@@ -3,6 +3,7 @@ import { getSupabaseClient } from '../services/supabaseClient';
 
 interface ConnectionStatus {
   url: string | null;
+  projectRef: string | null;
   isConnected: boolean;
   error: string | null;
   tables: string[];
@@ -13,6 +14,7 @@ export const SupabaseDebugPanel: React.FC = () => {
   const [isOpen, setIsOpen] = useState(true);
   const [status, setStatus] = useState<ConnectionStatus>({
     url: null,
+    projectRef: null,
     isConnected: false,
     error: null,
     tables: [],
@@ -31,7 +33,7 @@ export const SupabaseDebugPanel: React.FC = () => {
         '(not set)'
       ) as string;
       
-      // Extract project ref from URL
+      // Extract project ref from URL (e.g., "abcdefgh" from "https://abcdefgh.supabase.co")
       const projectRef = url.match(/https:\/\/([^.]+)\./)?.[1] || 'unknown';
       
       // Check for preview branch indicator in URL or env
@@ -58,6 +60,7 @@ export const SupabaseDebugPanel: React.FC = () => {
 
         setStatus({
           url: url,
+          projectRef: projectRef,
           isConnected: existingTables.length > 0,
           error: existingTables.length === 0 ? 'No tables accessible' : null,
           tables: existingTables,
@@ -66,6 +69,7 @@ export const SupabaseDebugPanel: React.FC = () => {
       } catch (err: any) {
         setStatus({
           url: url,
+          projectRef: projectRef,
           isConnected: false,
           error: err?.message || 'Connection failed',
           tables: [],
@@ -123,9 +127,14 @@ export const SupabaseDebugPanel: React.FC = () => {
             </span>
           </div>
           
+          <div className="bg-slate-800 rounded p-2 mt-2">
+            <div className="text-slate-500 text-[10px] uppercase tracking-wide">Project Ref</div>
+            <div className="text-cyan-400 font-bold">{status.projectRef || 'unknown'}</div>
+          </div>
+          
           <div className="text-slate-400">
             <span className="text-slate-500">URL:</span>{' '}
-            <span className="text-slate-300">{maskUrl(status.url || '')}</span>
+            <span className="text-slate-300 text-[11px]">{maskUrl(status.url || '')}</span>
           </div>
           
           {status.previewBranch && (
