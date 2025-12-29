@@ -1,4 +1,4 @@
--- v1 schema for field events + attendees + follow-ups.
+-- Migration 001: Create v1 schema for field events + attendees + follow-ups (with invariants + updated_at triggers).
 
 create extension if not exists pgcrypto;
 
