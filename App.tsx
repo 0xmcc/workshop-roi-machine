@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Icons } from './constants';
 import { StatCard } from './components/StatCard';
 import { WorkshopDetail } from './components/WorkshopDetail';
+import { SupabaseDebugPanel } from './components/SupabaseDebugPanel';
 import type { FieldEventSummary, FieldEventAttendee } from './types';
 import { attendeesRepo } from './services/repos/attendeesRepo';
 import { dashboardRepo, type DashboardMetrics } from './services/repos/dashboardRepo';
@@ -267,6 +268,9 @@ const App: React.FC = () => {
       <button className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl hover:bg-black transition-all transform hover:scale-110 active:scale-95 z-[100]">
         <Icons.Zap className="w-6 h-6 text-amber-400" />
       </button>
+
+      {/* Debug Panel */}
+      <SupabaseDebugPanel />
     </div>
   );
 };
