@@ -11,7 +11,6 @@ type AttendeeRow = {
   engagement_score: number;
   notes: string;
   questions_asked: number;
-  field_events?: { title: string } | null;
 };
 
 export const attendeesRepo = {
@@ -42,18 +41,33 @@ export const attendeesRepo = {
   async listHotLeads(limit: number): Promise<Array<FieldEventAttendee & { fieldEventTitle: string }>> {
     const supabase = getSupabaseClient();
 
-    const { data, error } = await supabase
+    // Fetch hot leads
+    const { data: attendees, error: attendeesError } = await supabase
       .from('field_event_attendees')
-      .select(
-        'id,field_event_id,name,email,project_name,status,engagement_score,notes,questions_asked,field_events(title)'
-      )
+      .select('id,field_event_id,name,email,project_name,status,engagement_score,notes,questions_asked')
       .gte('engagement_score', 85)
       .order('engagement_score', { ascending: false })
       .limit(limit);
 
-    if (error) throw error;
+    if (attendeesError) throw attendeesError;
+    if (!attendees || attendees.length === 0) return [];
 
-    return (data as AttendeeRow[]).map((row) => ({
+    // Fetch event titles separately (avoids PostgREST relationship cache issues)
+    const eventIds = [...new Set(attendees.map((a) => a.field_event_id))];
+    const { data: events, error: eventsError } = await supabase
+      .from('field_events')
+      .select('id,title')
+      .in('id', eventIds);
+
+    if (eventsError) throw eventsError;
+
+    // Build title lookup map
+    const titleMap = new Map<string, string>();
+    for (const event of events ?? []) {
+      titleMap.set(event.id, event.title);
+    }
+
+    return (attendees as AttendeeRow[]).map((row) => ({
       id: row.id,
       fieldEventId: row.field_event_id,
       name: row.name,
@@ -63,7 +77,7 @@ export const attendeesRepo = {
       engagementScore: row.engagement_score,
       notes: row.notes,
       questionsAsked: row.questions_asked,
-      fieldEventTitle: row.field_events?.title ?? '—'
+      fieldEventTitle: titleMap.get(row.field_event_id) ?? '—'
     }));
   }
 };
