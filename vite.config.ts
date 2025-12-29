@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      // Allow preview deploys to provide SUPABASE_* env vars without renaming to VITE_*.
+      envPrefix: ['VITE_', 'SUPABASE_'],
       server: {
         port: 3000,
         host: '0.0.0.0',

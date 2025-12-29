@@ -24,6 +24,13 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
+Preview deployments may instead provide:
+
+```bash
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+```
+
 Tip: copy `.env.example` to `.env.local`.
 
 ## Run locally
