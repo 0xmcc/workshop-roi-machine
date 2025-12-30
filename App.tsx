@@ -5,6 +5,7 @@ import { StatCard } from './components/StatCard';
 import { WorkshopDetail } from './components/WorkshopDetail';
 import { SupabaseDebugPanel } from './components/SupabaseDebugPanel';
 import { ImportModal } from './components/ImportModal';
+import { LumaSyncModal } from './components/LumaSyncModal';
 import type { FieldEventSummary, FieldEventAttendee } from './types';
 import { attendeesRepo } from './services/repos/attendeesRepo';
 import { dashboardRepo, type DashboardMetrics } from './services/repos/dashboardRepo';
@@ -20,6 +21,8 @@ const App: React.FC = () => {
 
   const [selectedFieldEventId, setSelectedFieldEventId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isLumaSyncModalOpen, setIsLumaSyncModalOpen] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -88,12 +91,62 @@ const App: React.FC = () => {
                 <h2 className="text-3xl font-bold text-slate-900">Performance Overview</h2>
                 <p className="text-slate-500 mt-1">Track your workshop conversion pipeline and hot leads.</p>
               </div>
-              <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2"
-              >
-                <span className="text-xl">+</span> Import Attendee List
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowImportMenu(!showImportMenu)}
+                  className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2"
+                >
+                  <span className="text-xl">+</span> Import Attendees
+                  <svg className={`w-4 h-4 transition-transform ${showImportMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {showImportMenu && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowImportMenu(false)} 
+                    />
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50">
+                      <button
+                        onClick={() => {
+                          setShowImportMenu(false);
+                          setIsLumaSyncModalOpen(true);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center gap-3 border-b border-slate-100"
+                      >
+                        <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900">Sync from Luma</div>
+                          <div className="text-xs text-slate-500">Connect to Luma API</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowImportMenu(false);
+                          setIsImportModalOpen(true);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900">Import CSV</div>
+                          <div className="text-xs text-slate-500">Upload Luma export file</div>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </header>
 
             {loadError && (
@@ -285,6 +338,15 @@ const App: React.FC = () => {
           loadData(); // Refresh data after import
         }}
         fieldEvents={fieldEvents?.map(e => ({ id: e.id, title: e.title })) ?? []}
+      />
+
+      {/* Luma Sync Modal */}
+      <LumaSyncModal
+        isOpen={isLumaSyncModalOpen}
+        onClose={() => setIsLumaSyncModalOpen(false)}
+        onSyncComplete={() => {
+          loadData(); // Refresh data after sync
+        }}
       />
     </div>
   );
