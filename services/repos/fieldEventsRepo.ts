@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../supabaseClient';
-import type { FieldEventSummary } from '../../types';
+import type { FieldEvent, FieldEventSummary } from '../../types';
 
 type FieldEventRow = {
   id: string;
@@ -10,7 +10,50 @@ type FieldEventRow = {
   conversion_goal: string;
 };
 
+export interface CreateFieldEventInput {
+  title: string;
+  date: string;
+  venue?: string;
+  topic?: string;
+  conversionGoal?: string;
+}
+
 export const fieldEventsRepo = {
+  /**
+   * Create a new field event.
+   */
+  async create(input: CreateFieldEventInput): Promise<FieldEvent> {
+    const supabase = getSupabaseClient();
+    
+    // Generate a slug-based ID from title and date
+    const id = `${input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${input.date}`.substring(0, 50);
+
+    const { data, error } = await supabase
+      .from('field_events')
+      .insert({
+        id,
+        title: input.title,
+        date: input.date,
+        venue: input.venue || 'TBD',
+        topic: input.topic || 'General',
+        conversion_goal: input.conversionGoal || 'Engagement'
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+
+    const row = data as FieldEventRow;
+    return {
+      id: row.id,
+      title: row.title,
+      date: row.date,
+      venue: row.venue,
+      topic: row.topic,
+      conversionGoal: row.conversion_goal
+    };
+  },
+
   async listSummaries(): Promise<FieldEventSummary[]> {
     const supabase = getSupabaseClient();
 

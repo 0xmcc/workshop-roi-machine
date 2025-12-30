@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { importLumaGuestList, validateLumaCsv } from '../services/lumaImportService';
+import { fieldEventsRepo } from '../services/repos/fieldEventsRepo';
 import type { LumaImportResult, FieldEventId } from '../types';
 
 interface ImportModalProps {
@@ -19,6 +20,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 }) => {
   const [step, setStep] = useState<ImportStep>('select');
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [createNewEvent, setCreateNewEvent] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventVenue, setNewEventVenue] = useState('');
   const [csvContent, setCsvContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [validationResult, setValidationResult] = useState<{
@@ -34,12 +39,21 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const resetState = () => {
     setStep('select');
     setSelectedEventId('');
+    setCreateNewEvent(false);
+    setNewEventTitle('');
+    setNewEventDate('');
+    setNewEventVenue('');
     setCsvContent('');
     setFileName('');
     setValidationResult(null);
     setImportResult(null);
     setError(null);
   };
+
+  // Check if event selection is valid (either existing or new event with required fields)
+  const isEventValid = createNewEvent 
+    ? (newEventTitle.trim() !== '' && newEventDate.trim() !== '')
+    : (selectedEventId !== '');
 
   const handleClose = () => {
     resetState();
@@ -75,23 +89,32 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   };
 
   const handleImport = async () => {
-    if (!selectedEventId || !csvContent) return;
+    if (!csvContent || !isEventValid) return;
 
     setStep('importing');
     setError(null);
 
     try {
+      let eventId = selectedEventId;
+
+      // Create new event if needed
+      if (createNewEvent) {
+        const newEvent = await fieldEventsRepo.create({
+          title: newEventTitle.trim(),
+          date: newEventDate.trim(),
+          venue: newEventVenue.trim() || undefined
+        });
+        eventId = newEvent.id;
+      }
+
       const result = await importLumaGuestList(csvContent, {
-        fieldEventId: selectedEventId,
+        fieldEventId: eventId,
         continueOnError: true
       });
       
       setImportResult(result);
       setStep('complete');
-      
-      if (result.errors.length === 0) {
-        onImportComplete();
-      }
+      onImportComplete();
     } catch (err: any) {
       setError(err?.message || 'Import failed');
       setStep('preview');
@@ -115,23 +138,98 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           {/* Step 1: Select Event & File */}
           {step === 'select' && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Select Field Event
-                </label>
-                <select
-                  value={selectedEventId}
-                  onChange={(e) => setSelectedEventId(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              {/* Event Selection Toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setCreateNewEvent(false); setSelectedEventId(''); }}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    !createNewEvent 
+                      ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-300' 
+                      : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200'
+                  }`}
                 >
-                  <option value="">Choose an event...</option>
-                  {fieldEvents.map((event) => (
-                    <option key={event.id} value={event.id}>
-                      {event.title}
-                    </option>
-                  ))}
-                </select>
+                  Existing Event
+                </button>
+                <button
+                  onClick={() => { setCreateNewEvent(true); setSelectedEventId(''); }}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    createNewEvent 
+                      ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-300' 
+                      : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200'
+                  }`}
+                >
+                  + New Event
+                </button>
               </div>
+
+              {/* Existing Event Selector */}
+              {!createNewEvent && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Select Field Event
+                  </label>
+                  <select
+                    value={selectedEventId}
+                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Choose an event...</option>
+                    {fieldEvents.map((event) => (
+                      <option key={event.id} value={event.id}>
+                        {event.title}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldEvents.length === 0 && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      No events yet. Use "New Event" to create one.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* New Event Form */}
+              {createNewEvent && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Event Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newEventTitle}
+                      onChange={(e) => setNewEventTitle(e.target.value)}
+                      placeholder="e.g., Web3 Builder Workshop SF"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={newEventDate}
+                        onChange={(e) => setNewEventDate(e.target.value)}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                        Venue
+                      </label>
+                      <input
+                        type="text"
+                        value={newEventVenue}
+                        onChange={(e) => setNewEventVenue(e.target.value)}
+                        placeholder="e.g., SF"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -146,9 +244,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={!selectedEventId}
+                  disabled={!isEventValid}
                   className={`w-full border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    selectedEventId
+                    isEventValid
                       ? 'border-slate-300 hover:border-indigo-400 cursor-pointer'
                       : 'border-slate-200 bg-slate-50 cursor-not-allowed'
                   }`}
@@ -161,7 +259,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                   ) : (
                     <div>
                       <div className="text-slate-500">
-                        {selectedEventId ? 'Click to select CSV file' : 'Select an event first'}
+                        {isEventValid ? 'Click to select CSV file' : 'Complete event details first'}
                       </div>
                       <div className="text-xs text-slate-400 mt-1">
                         Export from Luma → Guest List → Export CSV
@@ -182,7 +280,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           {/* Step 2: Preview */}
           {step === 'preview' && validationResult && (
             <div className="space-y-4">
-              <div className="bg-slate-50 rounded-lg p-4">
+              <div className="bg-slate-50 rounded-lg p-4 space-y-1">
                 <div className="text-sm text-slate-600">
                   <strong>File:</strong> {fileName}
                 </div>
@@ -190,8 +288,21 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                   <strong>Rows to import:</strong> {validationResult.rowCount}
                 </div>
                 <div className="text-sm text-slate-600">
-                  <strong>Event:</strong> {fieldEvents.find(e => e.id === selectedEventId)?.title}
+                  <strong>Event:</strong>{' '}
+                  {createNewEvent ? (
+                    <span className="text-indigo-600">
+                      {newEventTitle} <span className="text-slate-400">(new)</span>
+                    </span>
+                  ) : (
+                    fieldEvents.find(e => e.id === selectedEventId)?.title
+                  )}
                 </div>
+                {createNewEvent && (
+                  <div className="text-sm text-slate-600">
+                    <strong>Date:</strong> {newEventDate}
+                    {newEventVenue && <> • <strong>Venue:</strong> {newEventVenue}</>}
+                  </div>
+                )}
               </div>
 
               {validationResult.errors.length > 0 && (
