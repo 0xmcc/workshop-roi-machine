@@ -54,6 +54,44 @@ export const fieldEventsRepo = {
     };
   },
 
+  /**
+   * Get a single field event by ID with attendee count.
+   */
+  async getById(id: string): Promise<FieldEventSummary | null> {
+    const supabase = getSupabaseClient();
+
+    const { data: event, error: eventError } = await supabase
+      .from('field_events')
+      .select('id,title,date,venue,topic,conversion_goal')
+      .eq('id', id)
+      .single();
+
+    if (eventError) {
+      if (eventError.code === 'PGRST116') return null; // Not found
+      throw eventError;
+    }
+    if (!event) return null;
+
+    // Fetch attendee count
+    const { count, error: countError } = await supabase
+      .from('field_event_attendance')
+      .select('*', { count: 'exact', head: true })
+      .eq('field_event_id', id);
+
+    if (countError) throw countError;
+
+    const row = event as FieldEventRow;
+    return {
+      id: row.id,
+      title: row.title,
+      date: row.date,
+      venue: row.venue,
+      topic: row.topic,
+      conversionGoal: row.conversion_goal,
+      attendeeCount: count ?? 0
+    };
+  },
+
   async listSummaries(): Promise<FieldEventSummary[]> {
     const supabase = getSupabaseClient();
 
