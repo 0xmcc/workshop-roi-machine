@@ -4,6 +4,7 @@ import { Icons } from './constants';
 import { StatCard } from './components/StatCard';
 import { WorkshopDetail } from './components/WorkshopDetail';
 import { SupabaseDebugPanel } from './components/SupabaseDebugPanel';
+import { ImportModal } from './components/ImportModal';
 import type { FieldEventSummary, FieldEventAttendee } from './types';
 import { attendeesRepo } from './services/repos/attendeesRepo';
 import { dashboardRepo, type DashboardMetrics } from './services/repos/dashboardRepo';
@@ -18,38 +19,39 @@ const App: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedFieldEventId, setSelectedFieldEventId] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const [events, m, leads] = await Promise.all([
+        fieldEventsRepo.listSummaries(),
+        dashboardRepo.getMetrics(),
+        attendeesRepo.listHotLeads(5)
+      ]);
+
+      setFieldEvents(events);
+      setMetrics(m);
+      setHotLeads(leads);
+    } catch (err: any) {
+      setLoadError(err?.message ?? 'Failed to load data from Supabase.');
+      setFieldEvents([]);
+      setMetrics(null);
+      setHotLeads([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isStale = false;
 
-    async function load() {
-      setIsLoading(true);
-      setLoadError(null);
+    loadData().then(() => {
+      if (isStale) return;
+    });
 
-      try {
-        const [events, m, leads] = await Promise.all([
-          fieldEventsRepo.listSummaries(),
-          dashboardRepo.getMetrics(),
-          attendeesRepo.listHotLeads(5)
-        ]);
-
-        if (isStale) return;
-        setFieldEvents(events);
-        setMetrics(m);
-        setHotLeads(leads);
-      } catch (err: any) {
-        if (isStale) return;
-        setLoadError(err?.message ?? 'Failed to load data from Supabase.');
-        setFieldEvents([]);
-        setMetrics(null);
-        setHotLeads([]);
-      } finally {
-        if (isStale) return;
-        setIsLoading(false);
-      }
-    }
-
-    load();
     return () => {
       isStale = true;
     };
@@ -86,7 +88,10 @@ const App: React.FC = () => {
                 <h2 className="text-3xl font-bold text-slate-900">Performance Overview</h2>
                 <p className="text-slate-500 mt-1">Track your workshop conversion pipeline and hot leads.</p>
               </div>
-              <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2">
+              <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2"
+              >
                 <span className="text-xl">+</span> Import Attendee List
               </button>
             </header>
@@ -271,6 +276,16 @@ const App: React.FC = () => {
 
       {/* Debug Panel */}
       <SupabaseDebugPanel />
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportComplete={() => {
+          loadData(); // Refresh data after import
+        }}
+        fieldEvents={fieldEvents?.map(e => ({ id: e.id, title: e.title })) ?? []}
+      />
     </div>
   );
 };
