@@ -3,7 +3,7 @@ import React from 'react';
 
 interface StatCardProps {
   label: string;
-  value: string | number;
+  value: string | number | null;
   icon: React.ReactNode;
   trend?: string;
   trendUp?: boolean;
@@ -22,7 +22,7 @@ export const StatCard: React.FC<StatCardProps> = ({ label, value, icon, trend, t
       </div>
       <div>
         <p className="text-sm text-slate-500 font-medium">{label}</p>
-        <h3 className="text-2xl font-bold text-slate-800">{value}</h3>
+        <h3 className="text-2xl font-bold text-slate-800">{value ?? '—'}</h3>
       </div>
     </div>
   );

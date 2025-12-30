@@ -1,18 +1,30 @@
 
 import React from 'react';
-import { Workshop, ProjectStatus } from './types';
+import { FieldEvent, FieldEventAttendee, ProjectStatus } from './types';
 
-export const MOCK_WORKSHOPS: Workshop[] = [
+/**
+ * Seed-only data used to initialize Supabase for v1.
+ * The runtime app loads from Supabase and does not use these mocks.
+ */
+export const SEED_FIELD_EVENTS: Array<{
+  fieldEvent: FieldEvent;
+  attendees: Array<
+    Omit<FieldEventAttendee, 'fieldEventId'> & { fieldEventId: string; followUpSent: boolean }
+  >;
+}> = [
   {
-    id: 'w1',
-    title: 'AI Product Builder Masterclass',
-    date: '2024-05-15',
-    venue: 'Google Campus / SF',
-    topic: 'Building MVPs with Gemini API',
-    conversionGoal: 'Annual Pro Membership ($299)',
+    fieldEvent: {
+      id: 'w1',
+      title: 'AI Product Builder Masterclass',
+      date: '2024-05-15',
+      venue: 'Google Campus / SF',
+      topic: 'Building MVPs with Gemini API',
+      conversionGoal: 'Annual Pro Membership ($299)'
+    },
     attendees: [
       {
         id: 'a1',
+        fieldEventId: 'w1',
         name: 'Sarah Chen',
         email: 'sarah@example.com',
         projectName: 'Smart CRM Integration',
@@ -24,6 +36,7 @@ export const MOCK_WORKSHOPS: Workshop[] = [
       },
       {
         id: 'a2',
+        fieldEventId: 'w1',
         name: 'Marcus Thorne',
         email: 'marcus@devs.io',
         projectName: 'Voice Assistant for Seniors',
@@ -35,6 +48,7 @@ export const MOCK_WORKSHOPS: Workshop[] = [
       },
       {
         id: 'a3',
+        fieldEventId: 'w1',
         name: 'Elena Rodriguez',
         email: 'elena@startup.co',
         projectName: 'Eco-Tracker Dashboard',
@@ -47,15 +61,18 @@ export const MOCK_WORKSHOPS: Workshop[] = [
     ]
   },
   {
-    id: 'w2',
-    title: 'Modern React Frameworks',
-    date: '2024-05-10',
-    venue: 'Corporate Office / Austin',
-    topic: 'Next.js 14 and Server Components',
-    conversionGoal: 'Team Training Package ($4,999)',
+    fieldEvent: {
+      id: 'w2',
+      title: 'Modern React Frameworks',
+      date: '2024-05-10',
+      venue: 'Corporate Office / Austin',
+      topic: 'Next.js 14 and Server Components',
+      conversionGoal: 'Team Training Package ($4,999)'
+    },
     attendees: [
       {
         id: 'a4',
+        fieldEventId: 'w2',
         name: 'David Kim',
         email: 'david.k@corp.com',
         projectName: 'Internal Analytics Portal',

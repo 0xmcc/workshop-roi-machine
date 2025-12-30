@@ -1,27 +1,133 @@
 
-import React, { useState } from 'react';
-import { Workshop, Attendee, ProjectStatus } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { FieldEventSummary, FieldEventAttendee, FieldEventFollowup } from '../types';
+import { ProjectStatus } from '../types';
 import { Icons } from '../constants';
-import { generateFollowUpMessage } from '../services/geminiService';
+import { attendeesRepo } from '../services/repos/attendeesRepo';
+import { followupsRepo } from '../services/repos/followupsRepo';
 
 interface WorkshopDetailProps {
-  workshop: Workshop;
+  fieldEvent: FieldEventSummary;
   onBack: () => void;
 }
 
-export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack }) => {
-  const [selectedAttendee, setSelectedAttendee] = useState<Attendee | null>(null);
-  const [aiMessage, setAiMessage] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
+export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBack }) => {
+  const [attendees, setAttendees] = useState<FieldEventAttendee[] | null>(null);
+  const [followupsByAttendeeId, setFollowupsByAttendeeId] = useState<Record<string, FieldEventFollowup>>({});
 
-  const handleGenerateAI = async (attendee: Attendee) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [selectedAttendee, setSelectedAttendee] = useState<FieldEventAttendee | null>(null);
+  const [selectedFollowup, setSelectedFollowup] = useState<FieldEventFollowup | null>(null);
+
+  const [draftSubject, setDraftSubject] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isMarkingSent, setIsMarkingSent] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isStale = false;
+
+    async function load() {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const [a, f] = await Promise.all([
+          attendeesRepo.listByFieldEventId(fieldEvent.id),
+          followupsRepo.listByFieldEventId(fieldEvent.id)
+        ]);
+
+        if (isStale) return;
+
+        setAttendees(a);
+        setFollowupsByAttendeeId(Object.fromEntries(f.map((x) => [x.attendeeId, x])));
+      } catch (err: any) {
+        if (isStale) return;
+        setLoadError(err?.message ?? 'Failed to load attendees.');
+        setAttendees([]);
+        setFollowupsByAttendeeId({});
+      } finally {
+        if (isStale) return;
+        setIsLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      isStale = true;
+    };
+  }, [fieldEvent.id]);
+
+  const selectedFollowupIsEditable = selectedFollowup?.status === 'draft';
+
+  const handleOpenFollowup = async (attendee: FieldEventAttendee) => {
+    setActionError(null);
     setSelectedAttendee(attendee);
-    setIsGenerating(true);
-    setAiMessage('');
-    const msg = await generateFollowUpMessage(attendee, workshop);
-    setAiMessage(msg);
-    setIsGenerating(false);
+
+    try {
+      const followup = await followupsRepo.getOrCreateDraft({
+        fieldEventId: fieldEvent.id,
+        attendeeId: attendee.id,
+        attendeeEmail: attendee.email
+      });
+
+      setSelectedFollowup(followup);
+      setFollowupsByAttendeeId((prev) => ({ ...prev, [attendee.id]: followup }));
+      setDraftSubject(followup.subject);
+      setDraftBody(followup.body);
+    } catch (err: any) {
+      setActionError(err?.message ?? 'Failed to open follow-up.');
+    }
   };
+
+  const handleSaveDraft = async () => {
+    if (!selectedFollowup || selectedFollowup.status !== 'draft') return;
+
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      const updated = await followupsRepo.saveDraft({
+        followupId: selectedFollowup.id,
+        subject: draftSubject,
+        body: draftBody
+      });
+
+      setSelectedFollowup(updated);
+      setFollowupsByAttendeeId((prev) => ({ ...prev, [updated.attendeeId]: updated }));
+    } catch (err: any) {
+      setActionError(err?.message ?? 'Failed to save draft.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMarkSent = async () => {
+    if (!selectedFollowup || selectedFollowup.status !== 'draft') return;
+
+    setIsMarkingSent(true);
+    setActionError(null);
+    try {
+      const updated = await followupsRepo.markSent(selectedFollowup.id);
+      setSelectedFollowup(updated);
+      setFollowupsByAttendeeId((prev) => ({ ...prev, [updated.attendeeId]: updated }));
+    } catch (err: any) {
+      setActionError(err?.message ?? 'Failed to mark sent.');
+    } finally {
+      setIsMarkingSent(false);
+    }
+  };
+
+  const attendeeFollowupStatus = useMemo(() => {
+    const map: Record<string, 'draft' | 'sent'> = {};
+    for (const [attendeeId, followup] of Object.entries(followupsByAttendeeId)) {
+      map[attendeeId] = followup.status;
+    }
+    return map;
+  }, [followupsByAttendeeId]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -37,16 +143,20 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack
         <div className="p-8 border-b border-slate-100 bg-slate-50/50">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">{workshop.title}</h1>
-              <p className="text-slate-500">{workshop.date} • {workshop.venue}</p>
+              <h1 className="text-2xl font-bold text-slate-900">{fieldEvent.title}</h1>
+              <p className="text-slate-500">{fieldEvent.date} • {fieldEvent.venue}</p>
             </div>
             <div className="text-right">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full">
-                Conversion Goal: {workshop.conversionGoal}
+                Conversion Goal: {fieldEvent.conversionGoal}
               </span>
             </div>
           </div>
         </div>
+
+        {loadError && (
+          <div className="px-8 py-4 bg-red-50 border-b border-red-100 text-red-700 text-sm">{loadError}</div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -60,11 +170,18 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {workshop.attendees.map((attendee) => (
+              {(attendees ?? []).map((attendee) => (
                 <tr key={attendee.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-5">
                     <div className="font-semibold text-slate-800">{attendee.name}</div>
-                    <div className="text-xs text-slate-500">{attendee.email}</div>
+                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                      <span>{attendee.email}</span>
+                      {attendeeFollowupStatus[attendee.id] === 'sent' && (
+                        <span className="text-[10px] uppercase bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-bold">
+                          Sent
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-5">
                     <div className="text-sm text-slate-600">{attendee.projectName}</div>
@@ -87,7 +204,7 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack
                   </td>
                   <td className="px-8 py-5 text-right">
                     <button 
-                      onClick={() => handleGenerateAI(attendee)}
+                      onClick={() => handleOpenFollowup(attendee)}
                       className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                     >
                       <Icons.Sparkles className="w-4 h-4" />
@@ -96,6 +213,14 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack
                   </td>
                 </tr>
               ))}
+
+              {isLoading && (
+                <tr>
+                  <td className="px-8 py-6 text-sm text-slate-400" colSpan={5}>
+                    Loading attendees…
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -109,32 +234,65 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ workshop, onBack
           <div className="relative z-10 max-w-2xl">
             <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
               <Icons.Zap className="text-amber-400" />
-              Generated Strategy for {selectedAttendee.name}
+              Follow-up Draft for {selectedAttendee.name}
             </h3>
             <p className="text-indigo-200 text-sm mb-6">
-              AI-crafted sequence based on their project: "{selectedAttendee.projectName}"
+              Draft and send tracking for: "{selectedAttendee.projectName}"
             </p>
             
-            {isGenerating ? (
-              <div className="flex items-center gap-3 animate-pulse">
-                <div className="h-4 w-4 bg-indigo-400 rounded-full"></div>
-                <p className="text-indigo-300">Drafting the perfect pitch...</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-white/10 p-5 rounded-xl border border-white/10 font-mono text-sm leading-relaxed whitespace-pre-wrap">
-                  {aiMessage}
-                </div>
-                <div className="flex gap-3">
-                  <button className="bg-white text-indigo-900 hover:bg-indigo-50 px-6 py-2.5 rounded-lg font-semibold transition-colors">
-                    Send via Email
-                  </button>
-                  <button className="bg-transparent border border-white/30 text-white hover:bg-white/10 px-6 py-2.5 rounded-lg font-semibold transition-colors">
-                    Edit Sequence
-                  </button>
-                </div>
+            {actionError && (
+              <div className="mb-4 bg-white/10 border border-white/10 text-indigo-100 px-4 py-3 rounded-xl text-sm">
+                {actionError}
               </div>
             )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Subject</label>
+                <input
+                  value={draftSubject}
+                  onChange={(e) => setDraftSubject(e.target.value)}
+                  disabled={!selectedFollowupIsEditable}
+                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-60"
+                  placeholder="Subject"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Body</label>
+                <textarea
+                  value={draftBody}
+                  onChange={(e) => setDraftBody(e.target.value)}
+                  disabled={!selectedFollowupIsEditable}
+                  rows={8}
+                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-60 whitespace-pre-wrap"
+                  placeholder="Write your follow-up…"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={!selectedFollowupIsEditable || isSaving}
+                  className="bg-white text-indigo-900 hover:bg-indigo-50 px-6 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:hover:bg-white"
+                >
+                  {isSaving ? 'Saving…' : 'Save Draft'}
+                </button>
+                <button
+                  onClick={handleMarkSent}
+                  disabled={!selectedFollowupIsEditable || isMarkingSent}
+                  className="bg-transparent border border-white/30 text-white hover:bg-white/10 px-6 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:hover:bg-transparent"
+                >
+                  {isMarkingSent ? 'Marking…' : 'Mark as Sent'}
+                </button>
+              </div>
+
+              {selectedFollowup?.status === 'sent' && (
+                <div className="text-xs text-indigo-200">
+                  Sent{selectedFollowup.sentAt ? ` • ${new Date(selectedFollowup.sentAt).toLocaleString()}` : ''}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -1,20 +1,43 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Workshop ROI Machine (v1 with Supabase)
 
-# Run and deploy your AI Studio app
+This v1 stores **field events**, **attendees**, and **follow-ups** in Supabase so the app reloads to the same state (draft/sent), and dashboard metrics are derived from real data.
 
-This contains everything you need to run your app locally.
+## Prerequisites
 
-View your app in AI Studio: https://ai.studio/apps/drive/1a-O7k4pue-5W3419c4hF1r4ULvHdELCU
+- Node.js
+- A Supabase project (no auth/RLS required for this single-user v1)
 
-## Run Locally
+## Supabase setup (schema + seed)
 
-**Prerequisites:**  Node.js
+1. In your Supabase project, open **SQL Editor**.
+2. Run the migration:
+   - `supabase/migrations/001_field_events_v1.sql`
+3. Run the seed:
+   - `supabase/seed.sql`
 
+## Environment variables
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Create a `.env.local` file (or use your preferred Vite env file) with:
+
+```bash
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
+
+Preview deployments may instead provide:
+
+```bash
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+```
+
+Tip: copy `.env.example` to `.env.local`.
+
+## Run locally
+
+```bash
+npm install
+npm run build
+npm run preview
+```
+
