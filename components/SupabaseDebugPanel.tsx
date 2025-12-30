@@ -165,10 +165,25 @@ export const SupabaseDebugPanel: React.FC = () => {
             </div>
           )}
           
-          <div className="text-slate-600 text-[10px] mt-3 pt-2 border-t border-slate-700">
-            ENV: {import.meta.env.MODE} | 
-            VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'} | 
-            SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}
+          <div className="text-slate-600 text-[10px] mt-3 pt-2 border-t border-slate-700 space-y-1">
+            <div>
+              <span className="text-slate-500">Vercel Env:</span>{' '}
+              <span className={
+                import.meta.env.VERCEL_ENV === 'preview' ? 'text-amber-400' :
+                import.meta.env.VERCEL_ENV === 'production' ? 'text-green-400' :
+                'text-slate-400'
+              }>
+                {import.meta.env.VERCEL_ENV || 'local'}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500">Git Branch:</span>{' '}
+              <span className="text-cyan-400">{import.meta.env.VERCEL_GIT_COMMIT_REF || 'unknown'}</span>
+            </div>
+            <div>
+              VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'} | 
+              SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}
+            </div>
           </div>
         </div>
       )}
