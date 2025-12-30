@@ -15,15 +15,16 @@ export const dashboardRepo = {
     const supabase = getSupabaseClient();
 
     const eventsRes = await supabase.from('field_events').select('id', { count: 'exact', head: true });
+    // Query from new field_event_attendance table (not the legacy field_event_attendees)
     const totalAttendeesRes = await supabase
-      .from('field_event_attendees')
+      .from('field_event_attendance')
       .select('id', { count: 'exact', head: true });
     const shippedAttendeesRes = await supabase
-      .from('field_event_attendees')
+      .from('field_event_attendance')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'Shipped');
     const hotLeadsRes = await supabase
-      .from('field_event_attendees')
+      .from('field_event_attendance')
       .select('id', { count: 'exact', head: true })
       .gte('engagement_score', 80);
 

@@ -66,10 +66,10 @@ export const fieldEventsRepo = {
     if (eventsError) throw eventsError;
     if (!events || events.length === 0) return [];
 
-    // Fetch attendee counts separately (avoids PostgREST relationship cache issues)
+    // Fetch attendee counts from new field_event_attendance table
     const eventIds = events.map((e) => e.id);
     const { data: counts, error: countsError } = await supabase
-      .from('field_event_attendees')
+      .from('field_event_attendance')
       .select('field_event_id')
       .in('field_event_id', eventIds);
 
