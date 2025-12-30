@@ -180,9 +180,15 @@ export const SupabaseDebugPanel: React.FC = () => {
               <span className="text-slate-500">Git Branch:</span>{' '}
               <span className="text-cyan-400">{import.meta.env.VERCEL_GIT_COMMIT_REF || 'unknown'}</span>
             </div>
-            <div>
-              VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'} | 
-              SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}
+            <div className="grid grid-cols-2 gap-1 mt-1">
+              <span>VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'}</span>
+              <span>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</span>
+              <span className={import.meta.env.VITE_SUPABASE_ANON_KEY ? 'text-green-500' : 'text-red-500'}>
+                VITE_SUPABASE_ANON_KEY: {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓' : '✗'}
+              </span>
+              <span className={import.meta.env.SUPABASE_ANON_KEY ? 'text-green-500' : 'text-red-500'}>
+                SUPABASE_ANON_KEY: {import.meta.env.SUPABASE_ANON_KEY ? '✓' : '✗'}
+              </span>
             </div>
           </div>
         </div>
