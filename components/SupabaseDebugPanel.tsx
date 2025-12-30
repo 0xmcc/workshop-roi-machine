@@ -191,8 +191,9 @@ export const SupabaseDebugPanel: React.FC = () => {
                 <span className="text-slate-500">Anon Key:</span>{' '}
                 {(() => {
                   // Match the logic in supabaseClient.ts - use SUPABASE_* if URL is set
+                  // Integration uses SUPABASE_PUBLISHABLE_KEY, we also accept SUPABASE_ANON_KEY
                   const key = import.meta.env.SUPABASE_URL 
-                    ? (import.meta.env.SUPABASE_ANON_KEY as string | undefined)
+                    ? ((import.meta.env.SUPABASE_ANON_KEY as string | undefined) || (import.meta.env.SUPABASE_PUBLISHABLE_KEY as string | undefined))
                     : (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
                   if (!key) return <span className="text-red-500">NOT SET</span>;
                   return <span className="text-green-400">{key.substring(0, 12)}...{key.substring(key.length - 4)}</span>;
@@ -202,7 +203,7 @@ export const SupabaseDebugPanel: React.FC = () => {
                 <span>VITE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'}</span>
                 <span>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</span>
                 <span>VITE_KEY: {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓' : '✗'}</span>
-                <span>SUPABASE_KEY: {import.meta.env.SUPABASE_ANON_KEY ? '✓' : '✗'}</span>
+                <span>SUPABASE_KEY: {(import.meta.env.SUPABASE_ANON_KEY || import.meta.env.SUPABASE_PUBLISHABLE_KEY) ? '✓' : '✗'}</span>
               </div>
             </div>
           </div>

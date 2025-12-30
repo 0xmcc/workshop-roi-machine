@@ -15,9 +15,13 @@ export function getSupabaseClient(): SupabaseClient {
   
   // Prefer SUPABASE_* (injected by Supabase integration) if URL is set
   // This ensures preview deployments use preview credentials
+  // Note: Integration uses SUPABASE_PUBLISHABLE_KEY, we also accept SUPABASE_ANON_KEY
   if (import.meta.env.SUPABASE_URL) {
     url = (import.meta.env.SUPABASE_URL as string).trim();
-    anonKey = (import.meta.env.SUPABASE_ANON_KEY as string | undefined)?.trim();
+    anonKey = (
+      (import.meta.env.SUPABASE_ANON_KEY as string | undefined) ||
+      (import.meta.env.SUPABASE_PUBLISHABLE_KEY as string | undefined)
+    )?.trim();
   }
   
   // Fall back to VITE_* (manual config) if SUPABASE_* not available
