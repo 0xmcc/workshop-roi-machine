@@ -5,6 +5,7 @@ import { ProjectStatus, AttendanceStatus } from '../types';
 import { Icons } from '../constants';
 import { attendeesRepo } from '../services/repos/attendeesRepo';
 import { followupsRepo } from '../services/repos/followupsRepo';
+import { sendEmail, isResendConfigured } from '../services/email';
 
 const PAGE_SIZE = 10;
 
@@ -139,21 +140,49 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBa
     }
   };
 
-  const handleMarkSent = async () => {
-    if (!selectedFollowup || selectedFollowup.status !== 'draft') return;
+  const handleSendEmail = async () => {
+    if (!selectedFollowup || selectedFollowup.status !== 'draft' || !selectedAttendee) return;
 
     setIsMarkingSent(true);
     setActionError(null);
+    
     try {
+      // First, save any pending changes
+      if (draftSubject !== selectedFollowup.subject || draftBody !== selectedFollowup.body) {
+        await followupsRepo.saveDraft({
+          followupId: selectedFollowup.id,
+          subject: draftSubject,
+          body: draftBody
+        });
+      }
+
+      // Send the email via Resend (if configured)
+      if (isResendConfigured()) {
+        const emailResult = await sendEmail({
+          to: selectedAttendee.email,
+          subject: draftSubject,
+          body: draftBody
+        });
+
+        if (!emailResult.success) {
+          setActionError(`Failed to send email: ${emailResult.error}`);
+          return;
+        }
+      }
+
+      // Mark as sent in database
       const updated = await followupsRepo.markSent(selectedFollowup.id);
       setSelectedFollowup(updated);
       setFollowupsByAttendeeId((prev) => ({ ...prev, [updated.attendeeId]: updated }));
     } catch (err: any) {
-      setActionError(err?.message ?? 'Failed to mark sent.');
+      setActionError(err?.message ?? 'Failed to send email.');
     } finally {
       setIsMarkingSent(false);
     }
   };
+
+  // Legacy handler name for compatibility
+  const handleMarkSent = handleSendEmail;
 
   const attendeeFollowupStatus = useMemo(() => {
     const map: Record<string, 'draft' | 'sent'> = {};
@@ -414,9 +443,19 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBa
                   disabled={!selectedFollowupIsEditable || isMarkingSent}
                   className="bg-transparent border border-white/30 text-white hover:bg-white/10 px-6 py-2.5 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:hover:bg-transparent"
                 >
-                  {isMarkingSent ? 'Marking…' : 'Mark as Sent'}
+                  {isMarkingSent 
+                    ? 'Sending…' 
+                    : isResendConfigured() 
+                      ? 'Send Email' 
+                      : 'Mark as Sent'}
                 </button>
               </div>
+              
+              {!isResendConfigured() && (
+                <p className="text-xs text-indigo-300 mt-2">
+                  💡 Set VITE_RESEND_API_KEY to enable actual email sending
+                </p>
+              )}
 
               {selectedFollowup?.status === 'sent' && (
                 <div className="text-xs text-indigo-200">
