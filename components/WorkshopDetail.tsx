@@ -1,10 +1,20 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
-import type { FieldEventSummary, FieldEventAttendee, FieldEventFollowup } from '../types';
-import { ProjectStatus } from '../types';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import type { FieldEventSummary, FieldEventAttendee, FieldEventFollowup, PaginatedAttendees } from '../types';
+import { ProjectStatus, AttendanceStatus } from '../types';
 import { Icons } from '../constants';
 import { attendeesRepo } from '../services/repos/attendeesRepo';
 import { followupsRepo } from '../services/repos/followupsRepo';
+
+const PAGE_SIZE = 10;
+
+const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
+  [AttendanceStatus.ALL]: 'All Attendees',
+  [AttendanceStatus.CHECKED_IN]: 'Checked In',
+  [AttendanceStatus.APPROVED]: 'Approved (No Check-in)',
+  [AttendanceStatus.PENDING]: 'Pending',
+  [AttendanceStatus.REJECTED]: 'Rejected'
+};
 
 interface WorkshopDetailProps {
   fieldEvent: FieldEventSummary;
@@ -12,7 +22,12 @@ interface WorkshopDetailProps {
 }
 
 export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBack }) => {
-  const [attendees, setAttendees] = useState<FieldEventAttendee[] | null>(null);
+  // Pagination and filtering state
+  const [page, setPage] = useState(1);
+  const [attendanceFilter, setAttendanceFilter] = useState<AttendanceStatus>(AttendanceStatus.ALL);
+  
+  // Data state
+  const [paginatedData, setPaginatedData] = useState<PaginatedAttendees | null>(null);
   const [followupsByAttendeeId, setFollowupsByAttendeeId] = useState<Record<string, FieldEventFollowup>>({});
 
   const [isLoading, setIsLoading] = useState(true);
@@ -28,39 +43,58 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBa
   const [isMarkingSent, setIsMarkingSent] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Load attendees when page, filter, or event changes
+  const loadAttendees = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const result = await attendeesRepo.listByFieldEventId({
+        fieldEventId: fieldEvent.id,
+        page,
+        pageSize: PAGE_SIZE,
+        attendanceStatus: attendanceFilter
+      });
+      setPaginatedData(result);
+    } catch (err: any) {
+      setLoadError(err?.message ?? 'Failed to load attendees.');
+      setPaginatedData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fieldEvent.id, page, attendanceFilter]);
+
+  // Load followups once on mount
   useEffect(() => {
     let isStale = false;
 
-    async function load() {
-      setIsLoading(true);
-      setLoadError(null);
-
+    async function loadFollowups() {
       try {
-        const [a, f] = await Promise.all([
-          attendeesRepo.listByFieldEventId(fieldEvent.id),
-          followupsRepo.listByFieldEventId(fieldEvent.id)
-        ]);
-
+        const f = await followupsRepo.listByFieldEventId(fieldEvent.id);
         if (isStale) return;
-
-        setAttendees(a);
         setFollowupsByAttendeeId(Object.fromEntries(f.map((x) => [x.attendeeId, x])));
       } catch (err: any) {
-        if (isStale) return;
-        setLoadError(err?.message ?? 'Failed to load attendees.');
-        setAttendees([]);
-        setFollowupsByAttendeeId({});
-      } finally {
-        if (isStale) return;
-        setIsLoading(false);
+        // Non-critical, don't block UI
+        console.error('Failed to load followups:', err);
       }
     }
 
-    load();
-    return () => {
-      isStale = true;
-    };
+    loadFollowups();
+    return () => { isStale = true; };
   }, [fieldEvent.id]);
+
+  // Load attendees when dependencies change
+  useEffect(() => {
+    loadAttendees();
+  }, [loadAttendees]);
+
+  // Reset to page 1 when filter changes
+  const handleFilterChange = (newFilter: AttendanceStatus) => {
+    setAttendanceFilter(newFilter);
+    setPage(1);
+  };
+
+  const attendees = paginatedData?.attendees ?? [];
 
   const selectedFollowupIsEditable = selectedFollowup?.status === 'draft';
 
@@ -158,19 +192,44 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBa
           <div className="px-8 py-4 bg-red-50 border-b border-red-100 text-red-700 text-sm">{loadError}</div>
         )}
 
+        {/* Filter Bar */}
+        <div className="px-8 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-slate-600">Filter by status:</label>
+            <select
+              value={attendanceFilter}
+              onChange={(e) => handleFilterChange(e.target.value as AttendanceStatus)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              {Object.values(AttendanceStatus).map((status) => (
+                <option key={status} value={status}>
+                  {ATTENDANCE_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="text-sm text-slate-500">
+            {paginatedData ? (
+              <>
+                Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, paginatedData.total)} of {paginatedData.total}
+              </>
+            ) : null}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-8 py-4 font-semibold">Attendee</th>
-                <th className="px-6 py-4 font-semibold">Project</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold">Attendance</th>
+                <th className="px-6 py-4 font-semibold">Project Status</th>
                 <th className="px-6 py-4 font-semibold text-center">Score</th>
                 <th className="px-8 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(attendees ?? []).map((attendee) => (
+              {attendees.map((attendee) => (
                 <tr key={attendee.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-5">
                     <div className="font-semibold text-slate-800">{attendee.name}</div>
@@ -184,7 +243,34 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBa
                     </div>
                   </td>
                   <td className="px-6 py-5">
-                    <div className="text-sm text-slate-600">{attendee.projectName}</div>
+                    {(() => {
+                      if (attendee.checkedInAt) {
+                        return (
+                          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">
+                            ✓ Checked In
+                          </span>
+                        );
+                      }
+                      if (attendee.approvalStatus === 'approved') {
+                        return (
+                          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">
+                            Approved
+                          </span>
+                        );
+                      }
+                      if (attendee.approvalStatus === 'rejected' || attendee.approvalStatus === 'declined') {
+                        return (
+                          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+                            Rejected
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">
+                          {attendee.approvalStatus || 'Pending'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-5">
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
@@ -221,9 +307,54 @@ export const WorkshopDetail: React.FC<WorkshopDetailProps> = ({ fieldEvent, onBa
                   </td>
                 </tr>
               )}
+
+              {!isLoading && attendees.length === 0 && (
+                <tr>
+                  <td className="px-8 py-6 text-sm text-slate-400" colSpan={5}>
+                    No attendees found{attendanceFilter !== AttendanceStatus.ALL ? ' for this filter' : ''}.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {paginatedData && paginatedData.totalPages > 1 && (
+          <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-between">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="text-sm font-medium text-slate-600 hover:text-indigo-600 disabled:text-slate-300 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <Icons.ArrowRight className="w-4 h-4 rotate-180" />
+              Previous
+            </button>
+            <div className="flex items-center gap-2">
+              {Array.from({ length: paginatedData.totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                    p === page
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPage((p) => Math.min(paginatedData.totalPages, p + 1))}
+              disabled={page === paginatedData.totalPages}
+              className="text-sm font-medium text-slate-600 hover:text-indigo-600 disabled:text-slate-300 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              Next
+              <Icons.ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedAttendee && (

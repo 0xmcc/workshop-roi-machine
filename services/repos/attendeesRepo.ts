@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../supabaseClient';
-import type { FieldEventAttendee } from '../../types';
+import type { FieldEventAttendee, PaginatedAttendees } from '../../types';
+import { AttendanceStatus } from '../../types';
 
 /**
  * Attendees repository - queries from the NEW field_event_attendance + people tables
@@ -15,6 +16,8 @@ type AttendanceWithPersonRow = {
   engagement_score: number;
   notes: string;
   questions_asked: number;
+  approval_status: string | null;
+  checked_in_at: string | null;
   people: {
     id: string;
     email: string;
@@ -23,6 +26,13 @@ type AttendanceWithPersonRow = {
     last_name: string | null;
   };
 };
+
+export interface ListAttendeesParams {
+  fieldEventId: string;
+  page?: number;
+  pageSize?: number;
+  attendanceStatus?: AttendanceStatus;
+}
 
 function getDisplayName(person: AttendanceWithPersonRow['people']): string {
   if (person.name) return person.name;
@@ -34,13 +44,15 @@ function getDisplayName(person: AttendanceWithPersonRow['people']): string {
 
 export const attendeesRepo = {
   /**
-   * List attendees for a field event.
+   * List attendees for a field event with pagination and filtering.
    * Queries from field_event_attendance joined with people.
    */
-  async listByFieldEventId(fieldEventId: string): Promise<FieldEventAttendee[]> {
+  async listByFieldEventId(params: ListAttendeesParams): Promise<PaginatedAttendees> {
+    const { fieldEventId, page = 1, pageSize = 20, attendanceStatus = AttendanceStatus.ALL } = params;
     const supabase = getSupabaseClient();
 
-    const { data, error } = await supabase
+    // Build base query
+    let query = supabase
       .from('field_event_attendance')
       .select(`
         id,
@@ -51,6 +63,8 @@ export const attendeesRepo = {
         engagement_score,
         notes,
         questions_asked,
+        approval_status,
+        checked_in_at,
         people (
           id,
           email,
@@ -58,13 +72,39 @@ export const attendeesRepo = {
           first_name,
           last_name
         )
-      `)
-      .eq('field_event_id', fieldEventId)
-      .order('engagement_score', { ascending: false });
+      `, { count: 'exact' })
+      .eq('field_event_id', fieldEventId);
+
+    // Apply attendance status filter
+    if (attendanceStatus !== AttendanceStatus.ALL) {
+      switch (attendanceStatus) {
+        case AttendanceStatus.CHECKED_IN:
+          query = query.not('checked_in_at', 'is', null);
+          break;
+        case AttendanceStatus.APPROVED:
+          query = query.eq('approval_status', 'approved').is('checked_in_at', null);
+          break;
+        case AttendanceStatus.PENDING:
+          query = query.or('approval_status.eq.pending_approval,approval_status.eq.pending,approval_status.is.null');
+          break;
+        case AttendanceStatus.REJECTED:
+          query = query.or('approval_status.eq.rejected,approval_status.eq.declined');
+          break;
+      }
+    }
+
+    // Apply pagination and ordering
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    
+    const { data, error, count } = await query
+      .order('engagement_score', { ascending: false })
+      .range(from, to);
 
     if (error) throw error;
 
-    return (data as unknown as AttendanceWithPersonRow[]).map((row) => ({
+    const total = count ?? 0;
+    const attendees = (data as unknown as AttendanceWithPersonRow[]).map((row) => ({
       id: row.id,
       fieldEventId: row.field_event_id,
       name: getDisplayName(row.people),
@@ -73,8 +113,18 @@ export const attendeesRepo = {
       status: row.status as FieldEventAttendee['status'],
       engagementScore: row.engagement_score,
       notes: row.notes || '',
-      questionsAsked: row.questions_asked
+      questionsAsked: row.questions_asked,
+      approvalStatus: row.approval_status,
+      checkedInAt: row.checked_in_at
     }));
+
+    return {
+      attendees,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    };
   },
 
   /**
@@ -96,6 +146,8 @@ export const attendeesRepo = {
         engagement_score,
         notes,
         questions_asked,
+        approval_status,
+        checked_in_at,
         people (
           id,
           email,
@@ -136,6 +188,8 @@ export const attendeesRepo = {
       engagementScore: row.engagement_score,
       notes: row.notes || '',
       questionsAsked: row.questions_asked,
+      approvalStatus: row.approval_status,
+      checkedInAt: row.checked_in_at,
       fieldEventTitle: titleMap.get(row.field_event_id) ?? '—'
     }));
   }

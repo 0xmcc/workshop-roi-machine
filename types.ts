@@ -5,6 +5,22 @@ export enum ProjectStatus {
   NOT_STARTED = 'Not Started'
 }
 
+/**
+ * Attendance status derived from Luma data:
+ * - CHECKED_IN: Has a checked_in_at timestamp
+ * - APPROVED: approval_status is 'approved' but no check-in
+ * - PENDING: approval_status is 'pending_approval' or similar
+ * - REJECTED: approval_status is 'rejected' or 'declined'
+ * - ALL: No filter (show all)
+ */
+export enum AttendanceStatus {
+  ALL = 'all',
+  CHECKED_IN = 'checked_in',
+  APPROVED = 'approved',
+  PENDING = 'pending',
+  REJECTED = 'rejected'
+}
+
 export type FieldEventId = string;
 export type AttendeeId = string;
 export type PersonId = string;
@@ -34,6 +50,20 @@ export interface FieldEventAttendee {
   notes: string;
   questionsAsked: number;
   fieldEventId: FieldEventId;
+  // Luma attendance data
+  approvalStatus: string | null;
+  checkedInAt: string | null;
+}
+
+/**
+ * Result of paginated attendee query.
+ */
+export interface PaginatedAttendees {
+  attendees: FieldEventAttendee[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export type FollowupStatus = 'draft' | 'sent';
