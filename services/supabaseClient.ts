@@ -5,14 +5,26 @@ let _client: SupabaseClient | null = null;
 export function getSupabaseClient(): SupabaseClient {
   if (_client) return _client;
 
-  const url = (
-    (import.meta.env.VITE_SUPABASE_URL as string | undefined) ??
-    (import.meta.env.SUPABASE_URL as string | undefined)
-  )?.trim();
-  const anonKey = (
-    (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ??
-    (import.meta.env.SUPABASE_ANON_KEY as string | undefined)
-  )?.trim();
+  // IMPORTANT: Use matched pairs of URL + anon key from the same source.
+  // Supabase-Vercel integration injects SUPABASE_* for preview branches.
+  // VITE_* are typically set manually for production.
+  // Mixing them causes auth failures (JWT ref mismatch).
+  
+  let url: string | undefined;
+  let anonKey: string | undefined;
+  
+  // Prefer SUPABASE_* (injected by Supabase integration) if URL is set
+  // This ensures preview deployments use preview credentials
+  if (import.meta.env.SUPABASE_URL) {
+    url = (import.meta.env.SUPABASE_URL as string).trim();
+    anonKey = (import.meta.env.SUPABASE_ANON_KEY as string | undefined)?.trim();
+  }
+  
+  // Fall back to VITE_* (manual config) if SUPABASE_* not available
+  if (!url) {
+    url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+    anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+  }
 
   if (!url || !anonKey) {
     throw new Error(

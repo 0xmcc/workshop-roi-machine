@@ -181,17 +181,28 @@ export const SupabaseDebugPanel: React.FC = () => {
               <span className="text-cyan-400">{import.meta.env.VERCEL_GIT_COMMIT_REF || 'unknown'}</span>
             </div>
             <div className="space-y-1 mt-1">
-              <div className="grid grid-cols-2 gap-1">
-                <span>VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'}</span>
-                <span>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</span>
+              <div className="text-slate-400">
+                <span className="text-slate-500">Source:</span>{' '}
+                <span className={import.meta.env.SUPABASE_URL ? 'text-cyan-400' : 'text-amber-400'}>
+                  {import.meta.env.SUPABASE_URL ? 'SUPABASE_* (integration)' : 'VITE_* (manual)'}
+                </span>
               </div>
               <div className="text-slate-400">
                 <span className="text-slate-500">Anon Key:</span>{' '}
                 {(() => {
-                  const key = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY) as string | undefined;
+                  // Match the logic in supabaseClient.ts - use SUPABASE_* if URL is set
+                  const key = import.meta.env.SUPABASE_URL 
+                    ? (import.meta.env.SUPABASE_ANON_KEY as string | undefined)
+                    : (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
                   if (!key) return <span className="text-red-500">NOT SET</span>;
                   return <span className="text-green-400">{key.substring(0, 12)}...{key.substring(key.length - 4)}</span>;
                 })()}
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-slate-600">
+                <span>VITE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'}</span>
+                <span>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</span>
+                <span>VITE_KEY: {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓' : '✗'}</span>
+                <span>SUPABASE_KEY: {import.meta.env.SUPABASE_ANON_KEY ? '✓' : '✗'}</span>
               </div>
             </div>
           </div>
