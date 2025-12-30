@@ -180,15 +180,19 @@ export const SupabaseDebugPanel: React.FC = () => {
               <span className="text-slate-500">Git Branch:</span>{' '}
               <span className="text-cyan-400">{import.meta.env.VERCEL_GIT_COMMIT_REF || 'unknown'}</span>
             </div>
-            <div className="grid grid-cols-2 gap-1 mt-1">
-              <span>VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'}</span>
-              <span>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</span>
-              <span className={import.meta.env.VITE_SUPABASE_ANON_KEY ? 'text-green-500' : 'text-red-500'}>
-                VITE_SUPABASE_ANON_KEY: {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓' : '✗'}
-              </span>
-              <span className={import.meta.env.SUPABASE_ANON_KEY ? 'text-green-500' : 'text-red-500'}>
-                SUPABASE_ANON_KEY: {import.meta.env.SUPABASE_ANON_KEY ? '✓' : '✗'}
-              </span>
+            <div className="space-y-1 mt-1">
+              <div className="grid grid-cols-2 gap-1">
+                <span>VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✓' : '✗'}</span>
+                <span>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</span>
+              </div>
+              <div className="text-slate-400">
+                <span className="text-slate-500">Anon Key:</span>{' '}
+                {(() => {
+                  const key = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY) as string | undefined;
+                  if (!key) return <span className="text-red-500">NOT SET</span>;
+                  return <span className="text-green-400">{key.substring(0, 12)}...{key.substring(key.length - 4)}</span>;
+                })()}
+              </div>
             </div>
           </div>
         </div>
