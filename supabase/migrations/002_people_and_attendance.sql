@@ -167,3 +167,4 @@ comment on column public.field_event_attendance.luma_raw_data is 'Full raw row f
 comment on column public.field_event_attendance.status is 'Local tracking: Shipped, In Progress, Not Started.';
 
 comment on column public.field_event_followups.attendance_id is 'FK to attendance record. Followups are scoped to a specific attendance.';
+-- Trigger preview branch creation
