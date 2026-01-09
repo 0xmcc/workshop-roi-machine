@@ -77,7 +77,7 @@ export const performTransition = async (
     case 'unassign':
       state = AssignmentState.UNASSIGNED;
       exec = undefined;
-      history.push(createEvent(actor, 'UNASSIGN', existing?.execution_state || 'ASSIGNED', 'NULL'));
+      history.push(createEvent(actor, 'UNASSIGN', existing?.execution_state || AssignmentState.ASSIGNED, AssignmentState.UNASSIGNED));
       break;
     case 'start':
       exec = ExecutionState.IN_PROGRESS;
